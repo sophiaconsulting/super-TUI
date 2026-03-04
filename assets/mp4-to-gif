@@ -1,0 +1,137 @@
+#!/bin/zsh
+set -e
+
+source "${HOME}/.aliases-and-envs.zsh" 2>/dev/null || true
+source "${HOME}/shell/gum_utils.sh" 2>/dev/null || source "$(dirname "$0")/../shell/gum_utils.sh" 2>/dev/null || true
+
+SCRIPT_NAME=$(basename "$0")
+ASSETS_DIR="$(cd "$(dirname "$0")" && pwd)"
+RAW_DIR="${ASSETS_DIR}/raw"
+DEFAULT_FPS=15
+DEFAULT_WIDTH=800
+DEFAULT_QUALITY=80
+
+show_help() {
+    local cmd="$SCRIPT_NAME"
+    cat <<EOF
+Convert mp4 screen recordings to optimized GIFs for README embedding.
+
+Usage:
+  $cmd <input.mp4> [output.gif]  Convert a single file
+  $cmd --all                      Convert all mp4s in assets/raw/
+
+Options:
+  -f, --fps <n>       Frame rate (default: $DEFAULT_FPS)
+  -w, --width <n>     Output width in px (default: $DEFAULT_WIDTH, -1 = original)
+  -q, --quality <n>   gifski quality 1-100 (default: $DEFAULT_QUALITY, gifski only)
+  -t, --trim <start> <duration>  Trim input (e.g., -t 0.5 4)
+  --all               Batch convert all assets/raw/*.mp4
+  -h, --help          Show this help
+
+Examples:
+  $cmd assets/raw/ctrl_t.mp4
+  $cmd assets/raw/ctrl_t.mp4 assets/keybind_ctrl_t.gif
+  $cmd --fps 12 --width 600 --trim 1 5 assets/raw/ctrl_t.mp4
+  $cmd --all
+EOF
+    exit 0
+}
+
+check_deps() {
+    if ! command -v ffmpeg &>/dev/null; then
+        gum_error "ffmpeg is required: brew install ffmpeg" 2>/dev/null || echo "ERROR: ffmpeg is required: brew install ffmpeg"
+        exit 1
+    fi
+}
+
+has_gifski() {
+    command -v gifski &>/dev/null
+}
+
+convert_one() {
+    local input="$1" output="$2" fps="$3" width="$4" quality="$5" trim_start="$6" trim_duration="$7"
+
+    if [[ ! -f "$input" ]]; then
+        gum_error "File not found: $input" 2>/dev/null || echo "ERROR: File not found: $input"
+        return 1
+    fi
+
+    [[ -z "$output" ]] && output="${ASSETS_DIR}/$(basename "${input%.*}").gif"
+
+    local trim_flags=()
+    [[ -n "$trim_start" ]] && trim_flags+=(-ss "$trim_start")
+    [[ -n "$trim_duration" ]] && trim_flags+=(-t "$trim_duration")
+
+    local scale_filter="fps=${fps}"
+    [[ "$width" != "-1" ]] && scale_filter="fps=${fps},scale=${width}:-1:flags=lanczos"
+
+    if has_gifski; then
+        local tmpdir
+        tmpdir=$(mktemp -d)
+        trap "rm -rf '$tmpdir'" EXIT
+
+        gum_info "Extracting frames (gifski pipeline)..." 2>/dev/null || echo "→ Extracting frames..."
+        ffmpeg -loglevel warning "${trim_flags[@]}" -i "$input" \
+            -vf "${scale_filter}" \
+            "${tmpdir}/frame%04d.png"
+
+        local frame_count
+        frame_count=$(ls "${tmpdir}"/frame*.png 2>/dev/null | wc -l | tr -d ' ')
+
+        gum_info "Encoding ${frame_count} frames with gifski (quality=${quality})..." 2>/dev/null || echo "→ Encoding ${frame_count} frames..."
+        gifski -o "$output" --quality "$quality" --fps "$fps" "${tmpdir}"/frame*.png
+    else
+        gum_info "Converting with ffmpeg (install gifski for smaller files)..." 2>/dev/null || echo "→ Converting with ffmpeg..."
+        ffmpeg -loglevel warning "${trim_flags[@]}" -i "$input" \
+            -vf "${scale_filter},split[s0][s1];[s0]palettegen=max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=floyd_steinberg" \
+            -loop 0 -y "$output"
+    fi
+
+    local size
+    size=$(du -h "$output" | cut -f1 | tr -d ' ')
+    gum_success "$(basename "$output") (${size})" 2>/dev/null || echo "✓ $(basename "$output") (${size})"
+
+    if [[ "${size//[^0-9.]/}" > "10" ]] && [[ "$size" == *M* ]]; then
+        gum_warning "File exceeds 10MB — GitHub won't render it inline. Try --fps 10 or --width 600" 2>/dev/null || echo "⚠ File exceeds 10MB — try --fps 10 or --width 600"
+    fi
+}
+
+# --- Parse args ---
+fps=$DEFAULT_FPS
+width=$DEFAULT_WIDTH
+quality=$DEFAULT_QUALITY
+trim_start=""
+trim_duration=""
+batch=false
+positional=()
+
+[[ $# -eq 0 ]] && show_help
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help) show_help ;;
+        -f|--fps) fps="$2"; shift 2 ;;
+        -w|--width) width="$2"; shift 2 ;;
+        -q|--quality) quality="$2"; shift 2 ;;
+        -t|--trim) trim_start="$2"; trim_duration="$3"; shift 3 ;;
+        --all) batch=true; shift ;;
+        *) positional+=("$1"); shift ;;
+    esac
+done
+
+check_deps
+
+if $batch; then
+    mkdir -p "$RAW_DIR"
+    files=("${RAW_DIR}"/*.mp4(N) "${RAW_DIR}"/*.mov(N))
+    if [[ ${#files[@]} -eq 0 ]]; then
+        gum_warning "No .mp4 or .mov files in ${RAW_DIR}/" 2>/dev/null || echo "⚠ No files in ${RAW_DIR}/"
+        exit 0
+    fi
+    gum_info "Converting ${#files[@]} files..." 2>/dev/null || echo "→ Converting ${#files[@]} files..."
+    for f in "${files[@]}"; do
+        convert_one "$f" "" "$fps" "$width" "$quality" "$trim_start" "$trim_duration"
+    done
+else
+    convert_one "${positional[1]}" "${positional[2]}" "$fps" "$width" "$quality" "$trim_start" "$trim_duration"
+fi

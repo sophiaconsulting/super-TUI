@@ -1,0 +1,4 @@
+# Source recordings — only the converted GIFs are committed
+*.mp4
+*.mov
+*.webm

@@ -20,7 +20,11 @@
 
 </div>
 
-<img src="assets/agents_view.png" />
+<div align="center">
+
+![Super-TUI in action](assets/agent-view.gif)
+
+</div>
 
 > Powered by pure tmux — every standard tmux command and keybinding works exactly as you'd expect.
 
@@ -75,17 +79,52 @@ The setup script is idempotent -- safe to re-run at any time. It detects your OS
 
 These are the global keybindings that work everywhere in the shell. They are the selling point.
 
-| Key | What it does | Sub-bindings |
-|-----|-------------|--------------|
-| `Ctrl-T` | Fuzzy file finder | `Ctrl-T` again toggles local (`.`) vs global (`~`), `Ctrl-R` toggles files vs dirs, `Ctrl-F` opens in Helix |
-| `Ctrl-R` | Fuzzy history search | `Ctrl-V` view in pager, `Ctrl-Y` copy to clipboard, `Ctrl-T` track result |
-| `Ctrl-G` | Fuzzy directory jump (fasd) | Jump to frecent directories |
-| `Ctrl-X` | rfz (ripgrep fuzzy) | Live grep with preview |
-| `Ctrl-N` | tmux scrollback autocomplete | Complete from visible terminal output |
-| `Tab` | fzf tab completion | Contextual: git diff preview, process preview, dir drill-down |
-
 > [!TIP]
 > All fzf panels share vim-style nav: `Ctrl-J`/`K` scroll preview, `Ctrl-D`/`U` half-page, `Ctrl-/` toggles preview window.
+
+### `Ctrl-T` — Fuzzy File Finder
+
+`Ctrl-T` again toggles local (`.`) vs global (`~`), `Ctrl-R` toggles files vs dirs, `Ctrl-F` opens in Helix.
+
+![Ctrl-T fuzzy file finder](assets/ctrl-t-filepreview.gif)
+
+---
+
+### `Ctrl-R` — Fuzzy History Search
+
+`Ctrl-V` view in pager, `Ctrl-Y` copy to clipboard, `Ctrl-T` track result.
+
+![Ctrl-R fuzzy history search](assets/ctrl-r.gif)
+
+---
+
+### `Ctrl-G` — Fuzzy Directory Jump
+
+Jump to frecent directories via fasd.
+
+![Ctrl-G fuzzy directory jump](assets/ctrl-g.gif)
+
+---
+
+### `Ctrl-X` — Ripgrep Fuzzy Search
+
+Live grep across files with inline preview.
+
+![Ctrl-X ripgrep fuzzy search](assets/ctrl-x.gif)
+
+---
+
+### `Tab` — fzf Tab Completion
+
+Contextual completion: git diff preview, process preview, directory drill-down.
+
+![Tab fzf completion](assets/tab-complete.gif)
+
+---
+
+### `Ctrl-N` — tmux Scrollback Autocomplete
+
+Complete from visible terminal output. No demo — it works inline.
 
 ---
 
