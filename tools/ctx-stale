@@ -1,0 +1,164 @@
+#!/usr/bin/env zsh
+# Find directories with missing or stale *-context.md files.
+# A context file is "stale" if any sibling file is newer than it.
+# Usage: ctx-stale [directory] [--max-depth N] [--min-files N]
+#   directory:   root to scan (default: .)
+#   --max-depth: how deep to scan (default: 4)
+#   --min-files: skip dirs with fewer non-context files (default: 2)
+
+set -e
+
+source "${HOME}/dotfiles/shell/gum_utils.sh" 2>/dev/null || true
+
+dir="."
+max_depth=4
+min_files=2
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --max-depth) max_depth="$2"; shift 2 ;;
+        --min-files) min_files="$2"; shift 2 ;;
+        *) dir="$1"; shift ;;
+    esac
+done
+
+dir="${dir:A}"
+
+# Directories to always skip (caches, build outputs, IDE configs, etc.)
+skip_dirs=(
+    # Version control
+    '.git' '.svn' '.hg'
+    # IDE/editor configs
+    '.vscode' '.cursor' '.idea' '.eclipse'
+    # Claude/AI tools
+    '.claude' '.codex'
+    # Python
+    '.venv' 'venv' '.env' '__pycache__' '.mypy_cache' '.pytest_cache' '.ruff_cache'
+    '.tox' '.nox' '.eggs' 'egg-info' '.pytype' 'htmlcov' '.coverage'
+    # Node/JS
+    'node_modules' '.next' '.nuxt' '.output' '.svelte-kit' '.parcel-cache'
+    '.turbo' 'bower_components' '.yarn' '.pnpm-store'
+    # Build outputs
+    'dist' 'build' 'out' 'target' '_build'
+    # Package manager caches
+    '.uv' '.uv-cache' '.cache' '.npm' '.pnpm'
+    # Rust
+    '.cargo'
+    # Go
+    'vendor'
+    # Ruby
+    '.bundle'
+    # Misc
+    'tmp' 'temp' 'logs' '.terraform' '.serverless' '.vercel' '.netlify'
+)
+
+# Cross-platform mtime function
+get_mtime() {
+    if [[ "$(uname)" == "Darwin" ]]; then
+        stat -f '%m' "$1"
+    else
+        stat -c '%Y' "$1"
+    fi
+}
+
+should_skip() {
+    local d="$1"
+    for skip in "${skip_dirs[@]}"; do
+        [[ "$d" == *"/${skip}/"* || "$d" == *"/${skip}" ]] && return 0
+    done
+    return 1
+}
+
+# Check if directory is under a SKIP-marked parent
+is_under_skipped_parent() {
+    local d="$1"
+    for parent in "${skip_marked_parents[@]}"; do
+        [[ "$d" == "$parent/"* ]] && return 0
+    done
+    return 1
+}
+
+missing=()
+stale=()
+fresh=()
+skipped=()
+skip_marked_parents=()
+skipped_small=0
+
+# Find all directories (non-hidden, depth-limited)
+dirs=("${(@f)$(fd --type d --max-depth "$max_depth" '' "$dir" 2>/dev/null)}")
+# Include root
+dirs=("$dir" "${dirs[@]}")
+
+for d in "${dirs[@]}"; do
+    [[ -z "$d" ]] && continue
+    should_skip "$d" && continue
+    is_under_skipped_parent "$d" && continue
+
+    dirname="${d:t}"
+    [[ -z "$dirname" || "$dirname" == "." ]] && dirname="${dir:t}"
+    ctx_file="$d/${dirname}-context.md"
+
+    # Count non-context files in directory
+    file_count=$(fd --no-ignore --max-depth 1 --type f --exclude '*-context.md' '' "$d" 2>/dev/null | wc -l | tr -d ' ')
+
+    # Skip directories with too few files
+    if [[ "$file_count" -lt "$min_files" ]]; then
+        skipped_small=$((skipped_small + 1))
+        continue
+    fi
+
+    if [[ ! -f "$ctx_file" ]]; then
+        missing+=("$d")
+    else
+        # Check for SKIP marker on line 2
+        line2=$(sed -n '2p' "$ctx_file")
+        if [[ "$line2" == "> SKIP"* ]]; then
+            skipped+=("$d")
+            skip_marked_parents+=("$d")  # Track so we skip all subdirs too
+            continue
+        fi
+
+        # Check if any sibling is newer than the context file
+        ctx_mtime=$(get_mtime "$ctx_file")
+        is_stale=false
+        while IFS= read -r sibling; do
+            [[ -z "$sibling" ]] && continue
+            sib_mtime=$(get_mtime "$sibling")
+            if [[ "$sib_mtime" -gt "$ctx_mtime" ]]; then
+                is_stale=true
+                break
+            fi
+        done < <(fd --no-ignore --max-depth 1 --type f --exclude '*-context.md' '' "$d" 2>/dev/null)
+        if $is_stale; then
+            stale+=("$d")
+        else
+            fresh+=("$d")
+        fi
+    fi
+done
+
+if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "MISSING (${#missing[@]}):"
+    printf '  %s\n' "${missing[@]}"
+    echo ""
+fi
+
+if [[ ${#stale[@]} -gt 0 ]]; then
+    echo "STALE (${#stale[@]}):"
+    printf '  %s\n' "${stale[@]}"
+    echo ""
+fi
+
+if [[ ${#skipped[@]} -gt 0 ]]; then
+    echo "SKIPPED (${#skipped[@]}): intentionally excluded via SKIP marker"
+    printf '  %s\n' "${skipped[@]}"
+    echo ""
+fi
+
+echo "FRESH (${#fresh[@]}): up-to-date, no action needed"
+if [[ "$skipped_small" -gt 0 ]]; then
+    gum_dim "Skipped $skipped_small dirs with <$min_files files" 2>/dev/null || echo "Skipped $skipped_small dirs with <$min_files files"
+fi
+echo ""
+echo "Total: ${#missing[@]} missing, ${#stale[@]} stale, ${#skipped[@]} skipped, ${#fresh[@]} fresh"

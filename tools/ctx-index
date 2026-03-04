@@ -1,0 +1,111 @@
+#!/usr/bin/env zsh
+# Build a project map from *-context.md files — one summary line per directory.
+# Usage: ctx-index [directory] [--full] [--depth N]
+#   directory: root to scan (default: .)
+#   --full:    append file count and date metadata
+#   --depth N: directory levels to show (1=top-level dirs, 2=one nesting level, etc.)
+
+set -e
+
+source "${HOME}/dotfiles/shell/gum_utils.sh" 2>/dev/null || true
+
+dir="."
+full=false
+depth=""
+
+for arg in "$@"; do
+    if [[ "$arg" == "--full" ]]; then
+        full=true
+    elif [[ "$arg" == "--depth" ]]; then
+        depth="next"
+    elif [[ "$depth" == "next" ]]; then
+        depth="$arg"
+    else
+        dir="$arg"
+    fi
+done
+
+dir="${dir:A}"
+
+fd_args=(--no-ignore --glob '*-context.md' "$dir" --type f)
+# --depth N = N levels of directories; fd needs N+1 because context files are inside dirs
+[[ -n "$depth" && "$depth" != "next" ]] && fd_args+=(--max-depth "$((depth + 1))")
+
+context_files=("${(@f)$(fd "${fd_args[@]}" 2>/dev/null | sort)}")
+
+if [[ ${#context_files[@]} -eq 0 || -z "${context_files[1]}" ]]; then
+    gum_dim "No *-context.md files found under $dir" 2>/dev/null || echo "No *-context.md files found under $dir"
+    exit 0
+fi
+
+extract_summary() {
+    local file="$1"
+    local line2
+    line2=$(sed -n '2p' "$file")
+
+    # New format: line 2 is a blockquote
+    if [[ "$line2" == ">"* ]]; then
+        echo "${line2#> }"
+        return
+    fi
+
+    # Fallback: extract first line after ## Purpose
+    local in_purpose=false
+    while IFS= read -r line; do
+        if [[ "$line" == "## Purpose" ]]; then
+            in_purpose=true
+            continue
+        fi
+        if $in_purpose && [[ -n "$line" ]]; then
+            echo "$line"
+            return
+        fi
+    done < "$file"
+
+    echo "(no summary)"
+}
+
+extract_meta() {
+    local file="$1"
+    local line3
+    line3=$(sed -n '3p' "$file")
+
+    # New format: line 3 is backtick-wrapped metadata
+    if [[ "$line3" == '`'* ]]; then
+        # Strip backticks
+        line3="${line3#\`}"
+        line3="${line3%\`}"
+        echo "[$line3]"
+        return
+    fi
+
+    echo ""
+}
+
+gum_dim "${#context_files[@]} directories indexed" 2>/dev/null || echo "${#context_files[@]} directories indexed"
+echo ""
+
+for f in "${context_files[@]}"; do
+    [[ -z "$f" ]] && continue
+    [[ ! -f "$f" ]] && continue
+
+    # Derive directory name from the context file path
+    dirname="${f:h}"
+    # Make path relative to scan root
+    relpath="${dirname#$dir}"
+    relpath="${relpath#/}"
+    [[ -z "$relpath" ]] && relpath="."
+
+    summary=$(extract_summary "$f")
+
+    if $full; then
+        meta=$(extract_meta "$f")
+        if [[ -n "$meta" ]]; then
+            printf "%-30s %-60s %s\n" "$relpath" "$summary" "$meta"
+        else
+            printf "%-30s %s\n" "$relpath" "$summary"
+        fi
+    else
+        printf "%-30s %s\n" "$relpath" "$summary"
+    fi
+done
