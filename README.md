@@ -22,7 +22,7 @@
 
 <div align="center">
 
-![Super-TUI in action](assets/agent-view.gif)
+<video src="assets/agent-view.mp4" width="100%" controls></video>
 
 </div>
 
@@ -86,15 +86,13 @@ These are the global keybindings that work everywhere in the shell. They are the
 
 `Ctrl-T` again toggles local (`.`) vs global (`~`), `Ctrl-R` toggles files vs dirs, `Ctrl-F` opens in Helix.
 
-![Ctrl-T fuzzy file finder](assets/ctrl-t-filepreview.gif)
-
 ---
 
 ### `Ctrl-R` — Fuzzy History Search
 
 `Ctrl-V` view in pager, `Ctrl-Y` copy to clipboard, `Ctrl-T` track result.
 
-![Ctrl-R fuzzy history search](assets/ctrl-r.gif)
+<video src="assets/ctrl-r.mp4" width="100%" controls></video>
 
 ---
 
@@ -102,7 +100,7 @@ These are the global keybindings that work everywhere in the shell. They are the
 
 Jump to frecent directories via fasd.
 
-![Ctrl-G fuzzy directory jump](assets/ctrl-g.gif)
+<video src="assets/ctrl-g.mp4" width="100%" controls></video>
 
 ---
 
@@ -110,15 +108,13 @@ Jump to frecent directories via fasd.
 
 Live grep across files with inline preview.
 
-![Ctrl-X ripgrep fuzzy search](assets/ctrl-x.gif)
+<video src="assets/ctrl-x.mp4" width="100%" controls></video>
 
 ---
 
 ### `Tab` — fzf Tab Completion
 
 Contextual completion: git diff preview, process preview, directory drill-down.
-
-![Tab fzf completion](assets/tab-complete.gif)
 
 ---
 
