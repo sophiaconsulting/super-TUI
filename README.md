@@ -37,7 +37,7 @@
 ## Quick Start
 
 ```bash
-git clone https://github.com/vmasrani/dotfiles.git ~/dotfiles && cd ~/dotfiles
+git clone https://github.com/sophiaconsulting/super-TUI.git ~/dotfiles && cd ~/dotfiles
 ./setup.sh
 ```
 
