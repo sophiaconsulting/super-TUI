@@ -43,6 +43,8 @@ git clone https://github.com/sophiaconsulting/super-TUI.git ~/dotfiles && cd ~/d
 
 The setup script is idempotent -- safe to re-run at any time. It detects your OS, installs what's missing, and symlinks everything into place.
 
+_Warning: Not fully tested yet, make sure to back up existing dotfiles before running `./setup.sh`_
+
 ---
 
 ## Why super-TUI?
