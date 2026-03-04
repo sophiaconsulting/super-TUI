@@ -2,9 +2,9 @@
 
 <img src="assets/Stewie_Griffin.webp" width="120" />
 
-*"Named after the only baby who would insist on a properly configured terminal."*
+# Super-TUI
 
-# super-TUI, aka "STUI", aka "Stewie"
+*aka "STUI", aka "Stewie" — named after the only baby who would insist on a properly configured terminal.*
 
 **Your terminal, but better.**
 
@@ -16,11 +16,17 @@
 [![fzf](https://img.shields.io/badge/fzf-fuzzy%20finder-orange?style=flat-square)](https://github.com/junegunn/fzf)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-<video src="https://github.com/user-attachments/assets/REPLACE_WITH_GITHUB_ASSET_ID.mp4" autoplay loop muted playsinline></video>
-
 **60+ tools &middot; 20+ file previewers &middot; one command to install**
 
 </div>
+
+<img src="assets/agents_view.png" />
+
+> Powered by pure tmux — every standard tmux command and keybinding works exactly as you'd expect.
+
+1. **Popup window** — The agents view is a full-screen tmux popup (`Cmd+Shift+L` via iTerm2). It floats over your existing session so you can drop in and out without losing context.
+2. **Live usage widgets** — The status bar swaps to show real-time Claude API metrics: 5-hour and 7-day spend, Opus/Sonnet token counts, remaining credits, and rate-limit reset time.
+3. **Concurrent agents** — Each pane runs an independent Claude Code instance. Split, resize, and navigate between them with standard tmux pane commands. Run as many as your API limits allow.
 
 ---
 
@@ -169,8 +175,6 @@ Theme selection is automatic. The config detects `$SSH_CLIENT` / `$SSH_TTY` at l
 
 <details>
 <summary>Agents session: Claude usage metrics</summary>
-
-![agents](assets/agents_view.png)
 
 When the active session is `agents`, the status bar pills are replaced with:
 
