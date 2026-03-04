@@ -86,13 +86,16 @@ These are the global keybindings that work everywhere in the shell. They are the
 
 `Ctrl-T` again toggles local (`.`) vs global (`~`), `Ctrl-R` toggles files vs dirs, `Ctrl-F` opens in Helix.
 
+<video src="https://github.com/user-attachments/assets/df86689a-901a-4144-9655-97ea2bd8e8d1" width="100%" controls></video>
+
 ---
+
 
 ### `Ctrl-R` — Fuzzy History Search
 
 `Ctrl-V` view in pager, `Ctrl-Y` copy to clipboard, `Ctrl-T` track result.
 
-<video src="assets/ctrl-r.mp4" width="100%" controls></video>
+<video src="https://github.com/user-attachments/assets/6bb31e6f-1a01-486d-91d7-eec283efa009" width="100%" controls></video>
 
 ---
 
@@ -100,7 +103,7 @@ These are the global keybindings that work everywhere in the shell. They are the
 
 Jump to frecent directories via fasd.
 
-<video src="assets/ctrl-g.mp4" width="100%" controls></video>
+<video src="https://github.com/user-attachments/assets/79991537-b8c3-496f-aa65-2cd20909d8a8" width="100%" controls></video>
 
 ---
 
@@ -108,7 +111,7 @@ Jump to frecent directories via fasd.
 
 Live grep across files with inline preview.
 
-<video src="assets/ctrl-x.mp4" width="100%" controls></video>
+<video src="https://github.com/user-attachments/assets/ce824b40-5d02-4d10-a713-74926cd1676a" width="100%" controls></video>
 
 ---
 
@@ -116,11 +119,9 @@ Live grep across files with inline preview.
 
 Contextual completion: git diff preview, process preview, directory drill-down.
 
----
+<video src="https://github.com/user-attachments/assets/41a3b3e2-77ff-4283-a1d4-384df172b91f" width="100%" controls></video>
 
-### `Ctrl-N` — tmux Scrollback Autocomplete
 
-Complete from visible terminal output. No demo — it works inline.
 
 ---
 
