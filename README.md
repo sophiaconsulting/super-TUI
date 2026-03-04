@@ -22,7 +22,7 @@
 
 <div align="center">
 
-<video src="assets/agent-view.mp4" width="100%" controls></video>
+<video src="https://github.com/user-attachments/assets/9591ec9d-7590-441b-a72b-539cb0f0b2c2" width="100%" controls></video>
 
 </div>
 
