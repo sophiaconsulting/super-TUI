@@ -4,7 +4,7 @@
 
 *"Named after the only baby who would insist on a properly configured terminal."*
 
-# super-TUI
+# super-TUI, aka "STUI", aka "Stewie"
 
 **Your terminal, but better.**
 
