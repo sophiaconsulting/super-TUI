@@ -1,40 +1,26 @@
 # fzf
+> fzf shell integration: env vars, key bindings, completion, and custom widgets sourced by .zshrc.
+`4 files | 2026-04-03`
 
-## Purpose
-Fuzzy finder (fzf) configuration for shell environments. Provides custom key bindings, completion settings, environment variables, and preview windows for interactive command-line fuzzy searching across files, directories, and shell history.
+| Entry | Purpose |
+|-------|---------|
+| `.fzf-env.zsh` | Core env vars (`FZF_DEFAULT_OPTS`, `FZF_CTRL_T_OPTS`, etc.) and toggle logic — sourced first by `.fzf-config.zsh` |
+| `.fzf-config.zsh` | Custom zle widgets and completion hooks; sources `.fzf-env.zsh`, then wires everything to key bindings |
+| `.fzf.zsh` | Minimal bootstrap: adds fzf to PATH and runs `fzf --zsh` to load default shell integration |
+| `.fzf.bash` | Bash equivalent of `.fzf.zsh` (not used in the zsh chain but kept for portability) |
 
-## Key Files
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| `.fzf-env.zsh` | Environment variables and styling | FZF_DEFAULT_OPTS, FZF_CTRL_T_OPTS, FZF_CTRL_R_OPTS, FD_EXCLUDE, BFS_EXCLUDE |
-| `.fzf-config.zsh` | Zsh-specific keybindings and widgets | fzf-fasd-widget, fzf-tmux-widget, custom completion styles |
-| `.fzf.zsh` | Zsh initialization script | Source fzf --zsh, PATH setup |
-| `.fzf.bash` | Bash initialization script | Source fzf --bash, PATH setup |
+<!-- peek -->
 
-## Patterns
-- **Source composition**: Config files source `.fzf-env.zsh` for consistent environment setup
-- **Zle widgets**: Custom Zsh line editor widgets for keybindings (`fzf-fasd-widget`, `fzf-tmux-widget`)
-- **FZF options chaining**: Complex bind chains using `transform`, `reload`, and `execute` for interactive toggles
-- **Preview window toggles**: Ctrl-slash binding for toggling preview visibility across multiple contexts
-- **Fallback chains**: bfs -> fd for file discovery, with exclusion patterns
+## Conventions
 
-## Dependencies
-- **External**: fzf (fuzzy finder), fd (fast find alternative), fasd (recent directories), bat (syntax-highlighted previews), tmux, git, helix (hx), bfs (breadth-first search, optional), pbcopy (macOS clipboard)
-- **Internal**: Shell configuration sourced from `~/.zprezto/contrib/fzf-tab-completion`, references to helper scripts (`fzf-preview`)
+- `.fzf-config.zsh` is the file sourced by `.zshrc` (see shell config chain in CLAUDE.md). It sources `.fzf-env.zsh` itself — do NOT source `.fzf-env.zsh` separately.
+- All `FZF_DEFAULT_OPTS` are defined in `.fzf-env.zsh`. The active config uses `--style full --tmux 95%`; there are several large commented-out alternative configs above the active block — these are experiments, not dead code.
+- File/dir listing prefers `bfs` over `fd` when available (`bfs` is faster). The fallback to `fd` is automatic via the `if type -p bfs` guard in `.fzf-env.zsh`.
+- `FZF_PREVIEW_WINDOW_BINDING` is defined in `.fzf-env.zsh` and reused in `FZF_COMPLETION_OPTS` in `.fzf-config.zsh` — changing the binding in one place updates both.
 
-## Entry Points
-- `.fzf.zsh` — sourced from `~/.zshrc` for Zsh initialization
-- `.fzf.bash` — sourced from `~/.bashrc` for Bash initialization
-- `.fzf-config.zsh` — custom keybindings and completion (sourced from `.zshrc`)
+## Gotchas
 
-## Key Keybindings
-- `Ctrl-G` — fasd directory preview with fzf
-- `Ctrl-N` — tmux scrollback autocomplete
-- `Ctrl-X` — rfz command execution
-- `Ctrl-T` — file/directory picker with local/global toggle (Ctrl-T), files/dirs toggle (Ctrl-R)
-- `Ctrl-R` — shell history search with preview
-- `Tab` — fzf-based completion
-- `Ctrl-/` — toggle preview window visibility
-- `Ctrl-D/U` — preview half-page navigation
-- `Ctrl-J/K` — preview line navigation
-- `Ctrl-S` — toggle sort
+- `Ctrl-N` is bound to `fzf-tmux-widget` (fuzzy autocomplete from tmux scrollback), overriding fzf's default `preview-top` binding defined in `FZF_DEFAULT_OPTS`. The `--bind 'ctrl-n:preview-top'` in `.fzf-env.zsh` is shadowed at the widget level.
+- `Ctrl-T` inside the fzf file picker toggles between local (`.`) and global (`~`) search scope by inspecting `{fzf:prompt}` — the prompt string acts as state. Changing the prompt labels will break the toggle logic in `FZF_CTRL_T_LOCAL_GLOBAL_TOGGLE`.
+- `_fzf_compgen_path` and `_fzf_compgen_dir` override fzf's built-in completion path generators to use `fd` with `--no-ignore`. This means `.gitignore` is not respected in tab completion.
+- The `fzf-tab-completion` plugin is loaded from `~/.zprezto/contrib/fzf-tab-completion/` — this path must exist or `source` will fail silently and `^I` completion will revert to default.

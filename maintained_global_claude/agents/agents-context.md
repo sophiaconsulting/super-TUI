@@ -1,81 +1,28 @@
 # agents
+> Claude Code sub-agent definitions powering the `/create-plan` skill's spec-driven development pipeline.
+`6 files | 2026-04-03`
 
-_Last updated: 2026-01-27_
+| Entry | Purpose |
+|-------|---------|
+| `spec-interviewer.md` | Interviews the user to extract requirements and declarative `SC-N:` success criteria — runs first in the create-plan pipeline |
+| `codebase-researcher.md` | Researches the codebase via progressive disclosure (ctx-index → ctx-peek → Read) to find integration points for a feature |
+| `plan-writer.md` | Converts spec + research into a detailed implementation plan with exact file paths and subtasks — uses opus model |
+| `test-generator.md` | Generates exhaustive failing test suites from specs/plans/git diffs across 5 categories; creates justfile recipes and verifies red phase |
+| `context-researcher.md` | Analyzes a single directory and writes a `*-context.md` file — invoked by the `/research` skill, uses haiku model |
+| `structural-completeness-reviewer.md` | Post-change hygiene reviewer: finds dead code, orphaned imports, missing config updates — explicitly does NOT review functional correctness |
 
-## Purpose
+<!-- peek -->
 
-Defines Claude agent configurations for spec-driven development workflows. Each agent specializes in one phase of the spec-to-implementation pipeline: interviewing requirements, researching codebases, writing plans, and reviewing structural integrity.
+## Conventions
 
-## Key Files
+Each agent file uses YAML frontmatter with `name`, `description`, and `model` fields. The `description` field doubles as the trigger heuristic Claude uses to decide when to invoke the agent — it must be self-contained and example-rich.
 
-| File | Role | Model | Key Responsibility |
-|------|------|-------|-------------------|
-| spec-interviewer.md | Phase 1: Requirements gathering | sonnet | Conducts feature interviews and extracts testable success criteria |
-| codebase-researcher.md | Phase 2: Code analysis | sonnet | Analyzes codebase structure, patterns, and integration points using progressive disclosure |
-| plan-writer.md | Phase 3: Planning | opus | Generates detailed implementation plans with subtasks and code snippets |
-| structural-completeness-reviewer.md | Phase 4: Change review | sonnet | Reviews code changes for structural integrity, dead code, and technical debt |
-| context-researcher.md | Utility: Directory analysis | haiku | Generates structured context markdown files for codebase directories |
+Model selection is deliberate: `haiku` for cheap/repetitive tasks (context-researcher), `sonnet` for reasoning tasks, `opus` for high-stakes planning (plan-writer). Do not change models without considering cost implications.
 
-## Patterns
+## Gotchas
 
-**Multi-phase Workflow Coordination:**
-Sequential execution: spec-interviewer → codebase-researcher → plan-writer → (implementation) → structural-completeness-reviewer. Each phase produces artifacts fed to the next.
+The `spec-interviewer` → `codebase-researcher` → `plan-writer` → `test-generator` sequence is the create-plan pipeline order. Agents are designed to hand off artifacts (spec files in `.claude/specs/`, plan files in `.claude/plans/`) — breaking the naming convention breaks the handoff.
 
-**Progressive Disclosure Strategy (codebase-researcher):**
-- Phase 1: Run `ctx-tree . 3` for high-level directory overview
-- Phase 2: Run `ctx-peek . 8` to scan context file headers without loading full files
-- Phase 3: Read only 1-3 most relevant context files (max budget)
-- Phase 4: Use Grep for targeted pattern searches
-- Phase 5: Read specific source files as needed
+`structural-completeness-reviewer` is invoked automatically after complex changes, not just on demand. Its scope is intentionally narrow (no functional review) — adding functional checks would create duplicate review work with the test suite.
 
-**Agent Structure:**
-YAML frontmatter (name, description, model) followed by detailed role instructions with explicit input/output specifications and decision frameworks.
-
-**Read-only Constraints:**
-codebase-researcher and plan-writer use only Glob, Grep, Read, and Bash tools; never modify code.
-
-**Scoped Responsibilities:**
-- spec-interviewer: Requirements only (no code reading)
-- codebase-researcher: File discovery and pattern identification (no implementation)
-- plan-writer: Task decomposition and architecture (no code execution)
-- structural-completeness-reviewer: Structural integrity only (NOT functional correctness, tests, docs, or style)
-
-## Dependencies
-
-- **External:** None (agent definitions are markdown; executed by Claude Code platform)
-- **Internal:**
-  - Expects `.claude/specs/{feature-name}-spec.md` output from spec-interviewer
-  - Expects `.claude/plans/{feature-name}-plan.md` output from plan-writer
-  - Relies on `*-context.md` files in project directories for codebase-researcher's progressive disclosure
-  - Works with project's gitignore and directory structure
-
-## Entry Points
-
-Agents are invoked via Claude Code's agent system. Typical workflow:
-1. `/spec-interviewer` → Start new feature with requirements interview
-2. `/research` → Run codebase-researcher on a feature scope
-3. `/create-plan` → Generate implementation plan from spec + research
-4. Manual implementation based on plan
-5. `/arewedone` → Run structural-completeness-reviewer on completed changes
-
-## Notable Design Decisions
-
-**Model Selection:**
-- spec-interviewer, codebase-researcher: Claude Sonnet (balanced speed/capability/cost)
-- plan-writer: Claude Opus (complex reasoning for architecture decisions)
-- context-researcher: Claude Haiku (fast analysis for utility operations)
-
-**Isolation Principle:**
-Each agent has narrowly scoped responsibilities. Example: structural-completeness-reviewer explicitly excludes functional correctness, test quality, documentation, and code style reviews.
-
-**Success Criteria Format:**
-spec-interviewer produces verifiable, testable criteria in format `SC-N: {When X happens, Y should result}` to enable measurable implementation verification.
-
-**Context Window Protection:**
-codebase-researcher enforces strict context budget (~2-3 full context files) via progressive disclosure to maintain analysis capacity for complex codebases.
-
-**Plan Atomicity:**
-plan-writer decomposes features into independently verifiable subtasks, each touching 3-5 files max, with dependency ordering for execution by subagents.
-
-**Structural Focus:**
-structural-completeness-reviewer categorizes findings as "blocking" (breaks builds/deploys) or "debt-inducing" (future maintenance issues) for triage.
+`context-researcher` is the agent backing `/research` — it writes context files but explicitly checks for a `> SKIP` marker on line 2 before overwriting. Manually maintained context files must have this marker to survive regeneration.

@@ -1,29 +1,27 @@
-# Claude Skills
+# skills
+> Claude Code skill definitions — reusable agent workflows invoked via the Skill tool, each living in its own subdirectory with a SKILL.md.
+`0 files | 2026-04-03`
 
-_Last updated: 2026-01-27_
+| Entry | Purpose |
+|-------|---------|
+| **create-plan/** | Six-phase spec-driven dev skill: interviews user, writes spec, generates tests, researches codebase, plans, then executes via subagents. |
+| **design-principles/** | UI/UX principles for calm, high-signal analytical dashboards — calm layouts, cognitive load reduction. |
+| **data-visualization-techniques/** | Chart type selection, D3.js/Recharts patterns, and dashboard design for analytics/finance agents. |
+| **polish/** | Transform functional prototypes into production-grade apps with keyboard-first nav, command palettes, and polished UX. |
+| **request/** | Quick-add movies/TV shows to Sonarr/Radarr media stack via `/request` slash command. |
+| **log-to-daily/** | (Empty — no SKILL.md yet; stub directory for daily log processing skill.) |
+| **media-manager/** | (Empty — no SKILL.md yet; stub directory for media management skill.) |
 
-## Purpose
-Defines reusable Claude AI skills that implement structured workflows for complex development tasks. Currently contains the create-plan skill which orchestrates spec-driven development from requirements through implementation using multi-phase workflows.
+<!-- peek -->
 
-## Key Files
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| `create-plan/SKILL.md` | Main skill definition | Six-phase RPI workflow (interview, criteria, tests, research, planning, implementation) |
-| `create-plan/spec-template.md` | Specification template | Markdown boilerplate for feature specs with problem statement, success criteria, constraints |
-| `create-plan/create-plan-context.md` | Skill documentation | Contextual information about the create-plan skill |
+## Conventions
 
-## Patterns
-- **Multi-phase workflow:** Orchestrates sequential development phases with user confirmation gates
-- **Subagent delegation:** Launches specialized subagents (spec-interviewer, codebase-researcher, plan-writer, structural-completeness-reviewer) via Task tool for different concerns
-- **Test-first approach:** Generates failing tests from success criteria before implementation (red-green-refactor)
-- **Progressive disclosure:** Uses context files (*-context.md) to bootstrap codebase research before diving into specific files
-- **Parallel research:** Launches 2-3 researcher agents in parallel to investigate different architectural areas
+- Each skill lives in its own subdirectory. The entry point is always `SKILL.md` (or `skill.md` — casing varies: `request/` uses lowercase `skill.md`).
+- Skill frontmatter uses `name`, `description`, and optionally `user_invocable: true`. The `description` field is what surfaces in the Skill tool's trigger logic.
+- Skills with multi-phase workflows (e.g., `create-plan`) require user confirmation between phases — do NOT auto-advance.
+- `log-to-daily/` and `media-manager/` are empty stub directories with no SKILL.md — they are registered in the system but not yet implemented.
 
-## Entry Points
-- `create-plan` skill callable via `/create-plan` slash command in Claude Code
-- Invokes six distinct phases: Feature Interview, Success Criteria, Test Suite, Codebase Research, Implementation Plan, Implementation
+## Gotchas
 
-## Subdirectories
-| Directory | Purpose | Has Context File |
-|-----------|---------|-----------------|
-| `create-plan/` | Spec-driven development workflow | Yes (create-plan-context.md) |
+- File casing inconsistency: most skills use `SKILL.md` (uppercase) but `request/` uses `skill.md` (lowercase). Code that scans for skill files must handle both.
+- `create-plan` references a `spec-template.md` sibling file used during the spec-writing phase — it is not self-contained in SKILL.md alone.

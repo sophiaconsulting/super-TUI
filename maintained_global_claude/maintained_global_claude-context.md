@@ -1,71 +1,29 @@
 # maintained_global_claude
+> Version-controlled source of truth for Claude Code config — symlinked into `~/.claude/` by `setup.sh`; never edit `~/.claude/` directly.
+`5 files | 2026-04-03`
 
-## Purpose
+| Entry | Purpose |
+|-------|---------|
+| `settings.json` | Global Claude Code settings: hook registrations, tool permissions, enabled plugins, status line command — authoritative config, not a template |
+| `statusline.sh` | Renders the Claude Code status bar showing dir, git branch, time, and context window % — reads JSON from stdin piped by Claude |
+| `CLAUDE.md` | Project-level instructions loaded by Claude Code in this directory — contains Python/shell conventions and ctx-file protocol |
+| **agents/** | Sub-agent definitions (`.md` files): codebase-researcher, spec-interviewer, plan-writer, structural-completeness-reviewer, etc. |
+| **commands/** | Custom slash commands as `.md` files — invoked via `/commandname` in Claude Code (e.g., `/research`, `/generate-tests`) |
+| **hooks/** | Event-driven Python scripts fired on PostToolUse, Stop, SubagentStop, PreCompact — entry points are `post_tool_use.py`, `stop.py`, etc. |
+| **skills/** | Skill definitions loaded by the Skill tool — subdirs match skill names (e.g., `create-plan/`, `polish/`, `log-to-daily/`) |
+| **archive/** | Retired commands, skills, and plugins — kept for reference, not symlinked |
 
-Central repository of Claude Code configuration and automation, symlinked to `~/.claude/` during dotfiles setup. Provides agent definitions, CLI commands, system hooks, and skills for spec-driven development workflows using Claude AI.
+<!-- peek -->
 
-## Key Files
+## Conventions
+- This directory is the **edit target** — `~/.claude/` is just a symlink destination. Running `setup.sh` re-syncs everything; changes made directly in `~/.claude/` will be overwritten.
+- The `force_replace_targets` array in `setup.sh` deletes stale symlink targets before re-symlinking — safe to re-run after adding new files.
+- Hook scripts run via `uv run ~/.claude/hooks/<script>.py` — they must be self-contained with inline uv dependencies or importable from `hooks/utils/`.
+- Slash commands are plain Markdown files in `commands/` — the filename (without `.md`) becomes the command name.
+- Agent definitions in `agents/` are Markdown files; they appear as sub-agents available to skills like `create-plan`.
 
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| settings.json | Global Claude Code configuration | Permissions, hooks, plugins, environment settings |
-| agents/structural-completeness-reviewer.md | Technical lead agent for reviewing code changes | Structural integrity review methodology |
-| agents/spec-interviewer.md | Product engineer agent for feature interviews | Requirements extraction, success criteria generation |
-| agents/codebase-researcher.md | Research agent for codebase exploration | Progressive disclosure strategy via context files |
-| agents/plan-writer.md | Architect agent for implementation planning | Detailed subtask breakdown with code snippets |
-| agents/context-researcher.md | Analysis agent for directory context generation | Context file output format and methodology |
-| commands/arewedone.md | Structural completeness review workflow | Command entry point invoking reviewer agent |
-| commands/research.md | Context file generation and refresh workflow | Discovery, generation, and batching of context files |
-| commands/ocr.md | (Moved to ~/dotfiles/prompt_bank/ocr.md) | OCR-to-markdown conversion master prompt |
-| commands/process-parallel.md | Parallel processing pipeline template | Worker/runner/system-prompt pattern |
-| hooks/notification.py | Session notification handler with TTS | API key-based TTS selection (ElevenLabs > OpenAI > pyttsx3) |
-| hooks/post_tool_use.py | Logs tool execution events | JSON logging to `.claude/logs/post_tool_use.json` |
-| hooks/session_start.py | Session initialization hook | Detects stale context files on startup |
-| hooks/stop.py | Session completion handler | Announcement via TTS when work completes |
-| hooks/subagent_stop.py | Subagent completion handler | Similar to stop.py but for subagent threads |
-| hooks/pre_compact.py | Pre-compaction snapshot generator | Maintains rolling snapshots before context compaction |
-| hooks/refresh_context.py | Automated context file refresh | Calls Anthropic API to regenerate stale context files |
-
-## Patterns
-
-- **Agent-based workflows**: Spec-interviewer → plan-writer → structural-completeness-reviewer orchestration for feature delivery
-- **Progressive disclosure**: Context files enable agents to avoid reading entire codebases; start with `*-context.md` summaries
-- **Spec-driven development (RPI)**: Structured phases (interview, success criteria, tests, research, plan, implementation)
-- **Hook-based automation**: System hooks trigger at SessionStart, PostToolUse, Stop, PreCompact to log and notify
-- **TTS priority fallback**: ElevenLabs → OpenAI → pyttsx3 based on available API keys
-- **JSON event logging**: All hooks output JSON to `.claude/logs/` for audit trails
-- **Markdown-based prompts**: Agent definitions use frontmatter (YAML) + markdown instructions for clarity
-
-## Dependencies
-
-- **External:**
-  - Anthropic API (for refresh_context.py)
-  - OpenAI API (optional, for stop.py and subagent_stop.py TTS)
-  - ElevenLabs API (optional, for notification.py and stop.py TTS)
-  - python-dotenv (for loading environment variables)
-  - `uv` (universal Python package manager for all scripts)
-
-- **Internal:**
-  - Symlinked to `~/.claude/` during dotfiles setup via install_dotfiles() in install/install_functions.sh
-  - Referenced by dotfiles/.zshrc and shell configurations
-
-## Entry Points
-
-- **settings.json**: Initial configuration loaded by Claude Code UI; defines permissions, enabled plugins, and hook registration
-- **hooks/session_start.py**: Auto-triggered on each Claude session start; detects stale context files
-- **commands/arewedone.md**: Invoked via `/arewedone` slash command; launches structural-completeness-reviewer agent
-- **commands/research.md**: Invoked via `/research` slash command; discovers and generates context files
-- **skills/create-plan/SKILL.md**: Invoked via `/create-plan` slash command; orchestrates RPI workflow phases
-
-## Subdirectories
-
-| Directory | Purpose | Has Context File |
-|-----------|---------|-----------------|
-| agents | Agent definitions for spec interview, research, planning, review | no |
-| commands | CLI commands invoking agents or workflows | no |
-| hooks | System event handlers (session start, tool use, completion, compaction) | no |
-| skills | Complex skill definitions like create-plan with multi-phase orchestration | no |
-| hooks/utils/llm | LLM API wrappers (Anthropic, OpenAI) for hook scripts | no |
-| hooks/utils/tts | Text-to-speech implementations (ElevenLabs, OpenAI, pyttsx3) | no |
-| .claude | Logs directory for JSON event audit trails | no |
-| archive, debug, downloads, file-history, ide, plans, projects, session-env, shell-snapshots, statsig, telemetry, todos | Git-ignored directories for Claude internal state | no |
+## Gotchas
+- `settings.json` uses `skipDangerousModePermissionPrompt: true` — Claude Code runs in auto-approve mode. Adding new tool permissions here is sufficient; no interactive confirmation needed.
+- The `hooks/` `PostToolUse` matcher is an empty string (`""`), meaning it fires on **every** tool use — `post_tool_use.py` must be fast or it will visibly slow down every tool call.
+- `statusline.sh` reads JSON from stdin (piped by Claude Code) — it cannot be tested by running it directly without providing the JSON payload.
+- `archive/` contains a large `keyword-researcher` skill with Python source, tests, and browser automation — it is not active but adds significant directory weight; ignore it during searches.

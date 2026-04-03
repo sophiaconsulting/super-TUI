@@ -1,70 +1,35 @@
 # install
+> Shell scripts providing idempotent install helpers and the symlink system that wires this repo into `$HOME`.
+`5 files | 2026-04-03`
 
-## Purpose
-Provides modular installation functions and entry points for setting up development tools, language servers, dotfiles, and environment configuration across macOS and Linux systems with OS-specific fallback chains.
+| Entry | Purpose |
+|-------|---------|
+| `install_functions.sh` | Core library sourced by `setup.sh` — defines all install helpers and `install_dotfiles` (160+ symlink pairs) |
+| `install_helix_language_servers.sh` | Installs LSPs for Helix editor; separate because LSP setup is slow and language-specific |
+| `install-parquet-tools.sh` | Installs parquet CLI tooling; standalone to avoid bloating the main install pass |
+| `install_tar.sh` | Installs a modern `tar` (e.g., GNU tar on macOS where BSD tar is default) |
+| `install_htop.sh` | Installs htop via the cross-platform `install_on_brew_or_mac` helper |
 
-## Key Files
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| install_functions.sh | Core installation framework with 70+ tool installers and symlink management | `install_if_missing`, `install_on_brew_or_mac`, `install_with_fallback`, `install_dotfiles`, `ensure_symlink`, `OS_TYPE` |
-| runpod_functions.sh | RunPod-specific bridge for ephemeral /root to persistent /workspace/home | `bridge_root_to_workspace` |
-| install_helix_language_servers.sh | Installs language servers (markdown-oxide, yaml-language-server, bash-language-server, taplo, simple-completion-language-server, pyright) | N/A (direct npm/cargo calls) |
-| install_tar.sh | Generic tar.gz/tar.xz extractor and binary linker to ~/bin | URL parameter; extracts and symlinks executables |
-| install_npm.sh | NVM installation with LTS Node.js setup | N/A (nvm shell script) |
-| install_htop.sh | Linux-specific htop build from source with autotools | Builds htop from repo, installs to ~/bin |
-| install-parquet-tools.sh | Downloads and installs parquet-tools binary | Fetches v1.22.0 Linux binary from GitHub releases |
+<!-- peek -->
 
-## Patterns
+## Conventions
 
-**Idempotent Installer Pattern:**
-- `install_if_missing <cmd> <fn>` — Checks if command exists before calling install function
-- `install_if_dir_missing <dir> <fn>` — Checks directory existence to avoid redundant installs
-- All install functions follow convention: `install_<tool>` callable by name
+`install_functions.sh` is a library, not a script — it is sourced by `setup.sh`, never executed directly. It sources `$HOME/dotfiles/shell/helper_functions.sh` and `$HOME/dotfiles/shell/gum_utils.sh` at the top, so those must be present before it is sourced.
 
-**OS-Aware Fallback Chain:**
-- `install_with_fallback <pkg> <snap_flags> <fallback_fn>` — Attempts apt → snap → fallback function (macOS defaults to brew)
-- `install_on_brew_or_mac <linux_pkg> <mac_pkg>` — Simple abstraction for apt vs brew
+The two idempotency guards:
+- `install_if_missing <cmd> <fn>` — skips if `command_exists <cmd>` returns true
+- `install_if_dir_missing <dir> <fn>` — skips if directory exists
 
-**Symlink Management:**
-- `ensure_symlink <source> <target> <force_link>` — Creates/validates symlinks with optional force-replace mode
-- Force-replace targets: Claude/Codex config, agents, skills (always synced with repo)
+Cross-platform abstraction: `install_on_brew_or_mac <linux_pkg> [mac_pkg]` uses `$OS_TYPE` (set at file top from `$OSTYPE`). If `mac_pkg` is omitted, `linux_pkg` is used for both platforms.
 
-**Modular Dotfile Linking:**
-- `install_dotfiles [dotfiles_dir] [target_home]` — Declarative array of ~160 source:target pairs
-- Supports custom home path for RunPod `/workspace/home` bridging
-- Auto-creates parent directories and chmod+x all shell scripts
+All symlinks are defined as `source:target` pairs in the `file_pairs` array inside `install_dotfiles`. Adding a new symlink means appending one line to that array — no other changes needed.
 
-## Dependencies
+## Gotchas
 
-**External:**
-- `brew` (macOS package manager)
-- `apt` (Linux package manager)
-- `snap` (Linux fallback)
-- `npm`, `cargo` (language-specific package managers)
-- `git`, `wget`, `curl` (download/clone tools)
-- `gum` (terminal UI — required by all scripts, fallback to plain text)
-- Language servers: markdown-oxide, simple-completion-language-server, taplo-cli, yaml-language-server, vscode-langservers-extracted, bash-language-server, pyright
+`force_replace_targets` — Claude/Codex config dirs (`~/.claude/agents`, `~/.claude/hooks`, `~/.claude/skills`, `~/.claude/commands`, `~/.claude/settings.json`, etc.) are always deleted and re-symlinked on every `setup.sh` run. Other targets are left alone if they already exist (non-symlink warning only).
 
-**Internal:**
-- `../shell/helper_functions.sh` — `command_exists`, `move_and_symlink` utilities
-- `../shell/gum_utils.sh` — `gum_success`, `gum_error`, `gum_warning`, `gum_info`, `gum_dim` terminal output functions
-- Sourced by `setup.sh` and `setup_runpod.sh` as the orchestration engine
+`maintained_global_claude/plugins/` is deliberately NOT in the symlink list — it contains machine-specific absolute paths generated by `generate_plugin_configs` from `.template` files with `__HOME__` placeholders.
 
-## Entry Points
+`install_dotfiles` calls `chmod +x` on every file source it links, but skips directories — adding a non-executable script to the pairs list will make it executable automatically.
 
-- **`setup.sh`** (parent): Sources `install_functions.sh`, calls `install_if_missing` chains
-- **`setup_runpod.sh`** (parent): Calls `install_dotfiles "$dotfiles_dir" "/workspace/home"` for RunPod persistence
-- **`install_functions.sh`**: Primary entry point when sourced; exports 70+ install functions
-- **`install_helix_language_servers.sh`**: Standalone executable for language server setup
-- **`install_tar.sh`**: Reusable utility called by install functions (e.g., `install_bat`, `install_eza`)
-- **`install_npm.sh`**: Dedicated NVM bootstrap script
-- **`runpod_functions.sh`**: Exports `bridge_root_to_workspace`, called by boot guard to restore symlinks after pod restart
-
-## Notable Implementation Details
-
-- **~160 symlink pairs** in `install_dotfiles` covering shell, editors, Claude/Codex config, mutt, fzf, tmux
-- **TPM (Tmux Plugin Manager)** auto-installation with Catppuccin theme
-- **claude/codex force-replace array** ensures config always matches repo on re-runs
-- **RunPod dual-layer architecture**: Phase A (install to /workspace), Phase B (bridge /root → /workspace/home), Phase C (install tools)
-- **Binary download strategy**: nopme.in mirrors for Linux (tmux, rg, fd, jq), GitHub releases for specialized tools (bat, eza, parquet-tools)
-- **Email stack setup** (neomutt + isync + msmtp + notmuch) with pm2 background sync
+The script hardcodes `$HOME/dotfiles` as `$dotfiles` — the repo must be cloned to exactly `~/dotfiles` for `install_functions.sh` to work.

@@ -1,47 +1,24 @@
 # create-plan
+> Six-phase spec-driven dev skill: interviews user, writes spec, generates tests, researches codebase, plans, then executes via subagents.
+`2 files | 2026-04-03`
 
-_Last updated: 2026-01-27_
+| Entry | Purpose |
+|-------|---------|
+| `SKILL.md` | Orchestration script defining all 6 phases — the skill's executable definition |
+| `spec-template.md` | Template written to `.claude/specs/{feature-name}-spec.md` during Phase 2; defines the spec contract |
 
-## Purpose
+<!-- peek -->
 
-A structured skill that implements a six-phase spec-driven development workflow. Guides users from feature interview through implementation, leveraging subagents for parallel research and code generation.
+## Conventions
 
-## Key Files
+- Phases must run in order and each requires explicit user confirmation before proceeding to the next.
+- Specs are written to `.claude/specs/{feature-name}-spec.md` (relative to the project root), not inside this skill directory.
+- Phase 3 (test generation) delegates entirely to the `test-generator` agent at `maintained_global_claude/agents/test-generator.md` — do not inline test logic here.
+- Phase 4 launches 2-3 parallel `codebase-researcher` agents via `Task(..., run_in_background=true)` — researchers must read `*-context.md` files first before reading source.
+- Phase 6 runs `just test` after every subtask, compares pass/fail delta, and feeds `just test-verbose` output back to subagents on failure before moving on.
 
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| SKILL.md | Primary skill definition | Six-phase RPI workflow (Feature Interview, Success Criteria, Test Suite, Codebase Research, Implementation Plan, Implementation) |
-| spec-template.md | Markdown template for specs | Feature name, Problem Statement, Success Criteria, Constraints, Out of Scope, Test Locations, Implementation Subtasks |
+## Gotchas
 
-## Patterns
-
-**Six-Phase Workflow (RPI - Requirements, Plan, Implement)**
-1. Feature Interview: Structured questioning to capture requirements
-2. Success Criteria: Declarative, testable criteria extracted from interview
-3. Test Suite: Auto-detect framework and generate test cases
-4. Codebase Research: Parallel subagent research of multiple areas
-5. Implementation Plan: Detailed task breakdown with code snippets
-6. Implementation: Subagent-driven execution with continuous testing
-
-**Subagent Delegation**: Launches general-purpose agents in parallel via Task tool for interviews (spec-interviewer), research (codebase-researcher), planning (plan-writer), and implementation tasks.
-
-**Progressive Disclosure**: Codebase researchers first read `*-context.md` files before diving into specific files.
-
-## Dependencies
-
-**Internal**:
-- Subagent types: `spec-interviewer`, `codebase-researcher`, `plan-writer`, `structural-completeness-reviewer`
-- Claude Code Task tool for agent spawning
-- Framework auto-detection (pytest, jest, vitest, go.mod, Cargo.toml)
-
-## Entry Points
-
-SKILL.md is the primary entry point defining the create-plan skill workflow with mandatory phase execution and user confirmation between phases.
-
-## Notes
-
-- Each phase must be explicitly confirmed before proceeding
-- Success criteria must be verifiable, specific, and independent
-- Implementation subtasks should stay under 40% context size
-- Parallel research agents accelerate codebase analysis
-- Final review via structural-completeness-reviewer ensures quality
+- `SKILL.md` contains a placeholder `[paste spec-interviewer.md instructions]` in Phase 1 — this is intentional; the orchestrating agent must inline the interviewer instructions when constructing the Task prompt.
+- The spec template's `## Test File Locations` and `## Implementation Subtasks` sections are intentionally empty — they are filled in by Phases 3 and 5 respectively; don't treat blank sections as incomplete.
+- Coverage check (`just test-cov`) and structural review (`structural-completeness-reviewer` agent) only run after all subtasks complete, not per-subtask.

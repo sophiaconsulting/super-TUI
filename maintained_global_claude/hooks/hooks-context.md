@@ -1,40 +1,37 @@
 # hooks
+> Claude Code lifecycle hooks: safety guards, TTS notifications, session logging, and background context-file refresh.
+`9 files | 2026-04-03`
 
-_Last updated: 2026-01-27_
+| Entry | Purpose |
+|-------|---------|
+| `pre_tool_use.py` | Blocks dangerous `rm -rf` and `.env` file access before any tool runs; also logs all tool calls to `.claude/logs/pre_tool_use.json` |
+| `post_tool_use.py` | Logs all tool results to `.claude/logs/post_tool_use.json` — no blocking logic |
+| `stop.py` | On session end: logs to `.claude/logs/stop.json`, optionally copies JSONL transcript to `chat.json` (`--chat`), announces completion via TTS |
+| `subagent_stop.py` | Same as `stop.py` but for subagents; says "Subagent Complete" instead of LLM-generated message |
+| `notification.py` | On Claude waiting for input: logs event, optionally speaks "Your agent needs your input" via TTS (`--notify` flag required to activate speech) |
+| `session_start.py` | On session start: scans project for stale/missing context files and fires `refresh_context.py` as a background process |
+| `refresh_context.py` | Calls `claude-haiku-4-20250414` via Anthropic API to regenerate `*-context.md` files for given directories |
+| `pre_compact.py` | Before context compaction: appends a timestamped snapshot to `.claude/logs/compact_summary.md` (keeps last 5) |
+| **utils/** | TTS backends (ElevenLabs/OpenAI/pyttsx3) and LLM wrappers (oai.py, anth.py) used by stop/notification hooks |
 
-## Purpose
-Claude Code lifecycle hooks for session management, tool execution safeguards, and notifications. Handles pre-/post-tool validation, audio notifications on user input requests, context file auto-refresh, and session lifecycle events with optional TTS announcements.
+<!-- peek -->
 
-## Key Files
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| pre_tool_use.py | Validates tool calls before execution; blocks dangerous `rm -rf` and `.env` access patterns | Exit code 2 to block dangerous operations |
-| post_tool_use.py | Logs tool execution results to JSON for audit trail | Appends to `.claude/logs/post_tool_use.json` |
-| notification.py | Announces Claude waiting for user input via TTS (30% chance includes engineer name) | Multiple TTS backend support |
-| stop.py | Finalizes session with LLM-generated completion message and optional TTS announcement | Exports chat transcript to `.claude/logs/chat.json` |
-| subagent_stop.py | Similar to stop.py but for subagent completion events | Fixed "Subagent Complete" message |
-| session_start.py | Logs session initialization events | Records session metadata |
-| refresh_context.py | Auto-generates missing/stale context files for directories via Claude API | Runs async via `Popen` |
-| pre_compact.py | Records session snapshots in markdown format (keeps last 5) | Appends to `.claude/logs/compact_summary.md` |
+## Conventions
 
-## Patterns
-- **Defense in depth**: pre_tool_use catches both pattern-matching (rm -rf) and file access violations before execution
-- **Graceful degradation**: TTS and LLM calls fail silently; hooks never crash the session
-- **API fallback chain**: TTS prioritizes ElevenLabs > OpenAI > pyttsx3; LLM prioritizes OpenAI > Anthropic
-- **Background async**: refresh_context spawns subprocess to avoid blocking main agent thread
-- **JSON audit logs**: All hooks log to `.claude/logs/` directory for post-session analysis
+All hooks read JSON from stdin and exit 0 on success. Exit code 2 in `pre_tool_use.py` is the only blocking exit — it cancels the tool call and shows the stderr message to Claude. All other hooks exit 0 even on error (silent failure is deliberate).
 
-## Dependencies
-- **External:** python-dotenv, anthropic, openai, pyttsx3, elevenlabs
-- **Internal:** None (standalone hook scripts)
+TTS selection is runtime: hooks check env vars at call time in priority order `ELEVENLABS_API_KEY` → `OPENAI_API_KEY` → pyttsx3 (no key needed). Missing keys cause graceful skip, not failure.
 
-## Entry Points
-- All scripts are executable entry points called by Claude Code lifecycle events
-- Main flow: session_start -> [pre_tool_use -> tool execution -> post_tool_use] -> stop/subagent_stop
-- Background: pre_compact (on session start), refresh_context (async from pre_compact), notification.py (on input wait)
+`notification.py` only speaks when invoked with `--notify` flag AND the message is not the generic "Claude is waiting for your input" string. The flag must be set in `settings.json` hook config, not here.
 
-## Subdirectories
-| Directory | Purpose | Has Context File |
-|-----------|---------|-----------------|
-| utils/llm | LLM integration utilities (OpenAI, Anthropic completion generators) | Yes |
-| utils/tts | TTS backends (ElevenLabs, OpenAI, pyttsx3) | No |
+`stop.py` generates LLM completion messages (OpenAI first, then Anthropic) to announce completion — not a static string. `subagent_stop.py` always says "Subagent Complete" (no LLM call).
+
+## Gotchas
+
+`session_start.py` only runs in git repos — it exits immediately if `.git` is absent. Context refresh is fire-and-forget via `subprocess.Popen(..., start_new_session=True)` so it never blocks session startup.
+
+`refresh_context.py` uses a simple LLM prompt (not this agent) and writes a simpler context format without the `<!-- peek -->` zone — stale files it regenerates will lack peek-zone structure.
+
+All log files append by loading the full JSON array, appending, and rewriting — not streaming append. Large log files will cause increasing I/O per hook call.
+
+`.env` blocking in `pre_tool_use.py` checks `.env` substring in file paths, so `.env.local`, `.env.production`, etc. are also blocked (only `.env.sample` is exempted).

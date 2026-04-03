@@ -1,34 +1,27 @@
 # llm
+> LLM utility scripts for Claude hooks — thin wrappers around OpenAI (via DSPy) and Anthropic APIs for hook-side prompting.
+`6 files | 2026-04-03`
 
-_Last updated: 2026-01-27_
+| Entry | Purpose |
+|-------|---------|
+| `oai.py` | Standalone uv script; CLI entry point for OpenAI calls using DSPy + `gpt-4.1-nano`; accepts piped stdin as context with optional truncation |
+| `anth.py` | Standalone uv script; Anthropic wrapper using `claude-3-5-haiku` (max_tokens=100); exposes `generate_completion_message()` for post-task TTS/notification hooks; reads `ENGINEER_NAME` env var for personalised messages |
+| `pyproject.toml` | Package-level deps (dspy, typer, dotenv); used only if running as a package — individual scripts carry their own inline deps |
+| `main.py` | Placeholder stub (`print("Hello from llm!")`); not wired into anything |
 
-## Purpose
-Python utilities for LLM integration, providing command-line interfaces to query OpenAI (via DSPy) and Anthropic APIs. Used as helper scripts within Claude hooks and tools for dynamic LLM-based operations.
+<!-- peek -->
 
-## Key Files
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| `anth.py` | Anthropic LLM prompting script | `prompt_llm()`, `generate_completion_message()` |
-| `oai.py` | OpenAI/DSPy CLI tool | `prompt_llm()`, `main()` (Typer app) |
-| `test.py` | DSPy article drafting prototype | `DraftArticle` (DSPy Module) |
-| `pyproject.toml` | Project metadata and dependencies | dspy, typer, pandas, ipdb, python-dotenv |
-| `main.py` | Stub entry point | Placeholder |
-| `.python-version` | Python version pinning | 3.12 |
+## Conventions
 
-## Patterns
-- **Modular script design**: Two separate LLM integration paths (Anthropic via `anth.py`, OpenAI via `oai.py`), each with independent CLI
-- **DSPy framework**: `oai.py` and `test.py` use DSPy's typed signature system for structured LLM interactions
-- **CLI abstraction**: `oai.py` uses Typer for clean argument parsing; supports piped stdin and system prompt files
-- **Environment-based config**: Both scripts load from `.env` for API keys and parameters (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OAI_MAX_CONTEXT_CHARS`, `ENGINEER_NAME`)
+- Both `oai.py` and `anth.py` are self-contained uv inline-dependency scripts (shebang `#!/usr/bin/env -S uv run --script`) — they do NOT import from each other or from `main.py`.
+- `oai.py` reads `OAI_MAX_CONTEXT_CHARS` from the environment as a fallback when `--max-context-chars` is not passed; truncation takes the **last** N chars (tail, not head) so recent context is preserved.
+- `anth.py` silently returns `None` on any API error (uses bare `except Exception`) — callers must handle `None` gracefully; hooks should not crash on missing API key.
+- `anth.py` hard-codes `max_tokens=100` — unsuitable for long-form output; intended only for short completion/notification messages.
+- API keys are loaded from `.env` via `python-dotenv`; secrets must exist in `local/.local_env.sh` (git-ignored) or be in the environment at hook execution time.
 
-## Dependencies
-- **External:** dspy, typer, pandas, python-dotenv, anthropic, ipdb, rich
-- **Internal:** None (standalone utilities)
+## Gotchas
 
-## Entry Points
-- `anth.py` — Direct Anthropic API prompting; supports `--completion` flag for dynamic completion messages
-- `oai.py` — OpenAI DSPy wrapper with CLI; accepts prompt arguments, optional system prompt file (`-s/--sysprompt`), piped context, and max context truncation
-- `test.py` — Development/testing script demonstrating DSPy's article outline and drafting workflow
-
-## Subdirectories
-None
+- `main.py` is a dead stub — do not treat it as an entry point; only `oai.py` and `anth.py` are callable scripts.
+- `oai.py` uses DSPy's `dspy.LM` interface; the response type varies (list, str, or object with `.choices`) and the code handles all three, but adding a new model may need response-type testing.
+- `anth.py` uses the older argparse-style `sys.argv` interface (not typer), so CLI flags differ from `oai.py`.
+- The `pyproject.toml` requires Python >=3.12 but `anth.py` declares `requires-python = ">=3.8"` in its inline metadata — when run as a standalone script it uses its own declared minimum, not the package's.

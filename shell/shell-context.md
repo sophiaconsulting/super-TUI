@@ -1,67 +1,32 @@
-# Shell Configuration Directory
+# shell
+> Zsh configuration chain: `.zshrc`, aliases, PATH, helper functions, and gum-based terminal UI wrappers.
+`15 files | 2026-04-03`
 
-## Purpose
-Central location for zsh and bash initialization, configuration, and utility functions. Orchestrates the complete shell environment setup including prompt configuration (Powerlevel10k), aliases, PATH management, and terminal UI utilities. Supports both standard Linux/macOS and RunPod ephemeral container environments.
+| Entry | Purpose |
+|-------|---------|
+| `.zshrc` | Entry point — sources all other files in order; sets editor (hx), vi mode, and prezto init |
+| `.aliases-and-envs.zsh` | All aliases and env vars; overrides common tools (fd, rg, bat, less, mv, cp) with non-default flags |
+| `.paths.zsh` | PATH construction with dedup via awk; order matters (earlier = higher precedence) |
+| `helper_functions.sh` | `command_exists`, `move_and_symlink`, tmux copy-last-output hooks (`_clo_preexec`/`_clo_precmd`), `uwu` AI shell helper |
+| `gum_utils.sh` | Gum UI wrappers (`gum_success`, `gum_error`, `gum_info`, etc.) with TTY/non-TTY fallback; use these in all shell scripts |
+| `update_startup.sh` | Sourced during startup to run background update checks; rate-limited by `$STARTUP_CHECK_INTERVAL` |
+| `lscolors.sh` | LS color definitions — sourced by `.zshrc` for consistent directory/file coloring |
+| **themes/** | iTerm2 terminal color palette switchers using OSC escape sequences, primarily for visual SSH session distinction. |
 
-## Key Files
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| .zshrc | Main zsh initialization script | EDITOR, VISUAL, PAGER, KEYTIMEOUT |
-| .aliases-and-envs.zsh | All shell aliases and environment variables | Aliases for ls, navigation, git, tools; TABSTACK_API_KEY |
-| helper_functions.sh | Utility functions for shell operations | command_exists(), move_and_symlink(), file_count(), remove_broken_symlinks() |
-| gum_utils.sh | Terminal UI wrapper with graceful fallback | gum_success(), gum_error(), gum_warning(), gum_info(), gum_spin_quick(), gum_confirm() |
-| .paths.zsh | PATH construction and environment setup | PATH (deduplicated), NVM_DIR, BAT_THEME, HTOP_FILTER |
-| runpod_boot_guard.sh | RunPod ephemeral storage bridge | Restores /root -> /workspace/home symlinks on pod restart |
-| .zpreztorc | Prezto framework configuration | Prompt theme (powerlevel10k), history, modules, keybindings |
-| lscolors.sh | Terminal color scheme (LS_COLORS) | LS_COLORS (256 color definitions) |
-| .zshenv | Zsh environment variables (non-login) | LANG, fpath additions |
-| .zprofile | Zsh login shell initialization | PATH deduplication, cargo env sourcing |
-| .bashrc | Bash initialization (RunPod fallback) | RunPod boot guard, zsh execution |
+<!-- peek -->
 
-## Patterns
-- **Initialization Chain**: .zshenv (env vars) -> .zprofile (login) -> .zshrc (interactive) with conditional RunPod support
-- **Graceful Degradation**: gum_utils.sh provides terminal UI with plain-text fallback for non-TTY environments (cron, pipes, launchd)
-- **Idempotent PATH Management**: Array-based PATH additions with deduplication and directory existence checks
-- **RunPod Two-Layer Approach**: Ephemeral /root bridges to persistent /workspace/home via boot guard on every shell start
-- **Modular Sourcing**: Core functionality split into helper_functions.sh, gum_utils.sh, and lscolors.sh for reusability
-- **Feature Flags**: Environment variables (NO_GUM, DOTFILES_NO_GUM) control behavior across tools
+## Conventions
 
-## Dependencies
-- **External Tools**: gum (terminal UI), fzf (fuzzy finder), bat (syntax highlighting), eza (ls replacement), ripgrep (rg), fd, htop, lazygit
-- **Frameworks**: Prezto (zsh framework), Powerlevel10k (prompt), zprezto modules (editor, history, completion, syntax-highlighting, autosuggestions, git, fasd)
-- **External Integrations**: Cargo (.cargo/env), NVM (Node.js), Bun runtime, FZF, iTerm2 shell integration
-- **Internal**: References to ~/dotfiles/install/runpod_functions.sh, ~/dotfiles/update_checks/update_functions.sh, ~/.local_env.sh (secrets, git-ignored)
+- Files are symlinked to `$HOME` (not `~/dotfiles/shell/`) — `.zshrc` sources `~/helper_functions.sh`, not a relative path.
+- `.zshrc` sources files from `$HOME` (e.g., `~/helper_functions.sh`), not from `~/dotfiles/shell/`. Edits must go in the repo, but runtime paths are `~/*.sh`.
+- Theme switching is automatic: SSH sessions load `gruvbox-dark.zsh`, local sessions set `DOTFILES_THEME=palenight`.
+- `fd` and `rg` aliases add `-HI` and `--no-ignore` respectively — they search hidden/ignored files by default, unlike standard behavior.
+- `less` alias is defined twice in `.aliases-and-envs.zsh`; the second definition wins.
 
-## Entry Points
-- **.zshrc** - Main entry point for interactive zsh shells; sources all configuration files in specific order
-- **.bashrc** - Bash fallback (minimal); executes zsh on RunPod or sources RunPod boot guard
-- **.zshenv** - Earliest entry point for all zsh shells; sets LANG and fpath
-- **runpod_boot_guard.sh** - Called from .zshrc/.bashrc on RunPod to re-establish symlink bridges
+## Gotchas
 
-## Subdirectories
-None. This directory is flat; all shell configuration files are at root level.
-
-## Configuration Chain (from .zshrc)
-1. Zprezto instant prompt (p10k cache)
-2. RunPod boot guard (if /workspace/home exists)
-3. Zprezto initialization (.zprezto/init.zsh)
-4. Core utilities (helper_functions.sh, gum_utils.sh, lscolors.sh)
-5. Aliases and environment (.aliases-and-envs.zsh)
-6. Local secrets (.local_env.sh, git-ignored)
-7. PATH management (.paths.zsh)
-8. FZF configuration (.fzf.zsh, .fzf-config.zsh)
-9. Powerlevel10k prompt (.p10k.zsh)
-10. Cargo, Bun, and other tool integrations
-
-## Notable Environment Variables
-| Variable | Purpose | Source |
-|----------|---------|--------|
-| EDITOR, VISUAL | Default editor (hx/helix) | .zshrc |
-| PAGER | Default pager (less with flags) | .zshrc |
-| KEYTIMEOUT | Vi-mode transition speed | .zshrc |
-| DIRSTACKSIZE | Directory stack size | .zshrc |
-| TABSTACK_API_KEY | External service key | .aliases-and-envs.zsh |
-| HTOP_FILTER | Processes to exclude from htop | .paths.zsh |
-| EZA_TREE_IGNORE | Directories to hide in tree view | .aliases-and-envs.zsh |
-| BAT_THEME | Syntax highlighting theme | .paths.zsh |
-| UPDATE_CHECK_ON_STARTUP | Enable startup update checks | update_startup.sh |
+- `gum_utils.sh` lazily initializes gum availability on first call via `_gum_init` (cached in `_GUM_AVAILABLE`). If gum is installed after sourcing, re-source the file or the cached value stays 0.
+- `update_startup.sh` sources `~/dotfiles/update_checks/update_functions.sh` with a hardcoded path — breaks if dotfiles are not at `~/dotfiles/`.
+- PATH dedup in `.paths.zsh` uses `awk + sed`; runs on every shell start. NVM path is conditionally added only if `nvm current` returns a non-system version.
+- `_clo_preexec`/`_clo_precmd` hooks in `helper_functions.sh` only register inside tmux (`$TMUX` check) — tmux copy-last-output feature silently does nothing outside tmux.
+- `NO_GUM=1` or `DOTFILES_NO_GUM=1` disables gum globally; useful in CI/cron but must be set before any gum function is first called (due to lazy init caching).

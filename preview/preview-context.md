@@ -1,35 +1,25 @@
 # preview
+> fzf file preview handlers — a dispatch script plus per-format Python/shell scripts, all symlinked into `~/bin/`.
+`8 files | 2026-04-03`
 
-## Purpose
-Collection of file preview utilities for FZF and terminal viewing. Handles various data formats (CSV, JSON, Parquet, PyTorch, NumPy, Feather, pickle) and media types (images, PDFs, videos, notebooks) with syntax highlighting and pretty-printing.
+| Entry | Purpose |
+|-------|---------|
+| `fzf-preview.sh` | Central dispatcher: matches file extension and calls the right viewer; falls back to `tldr` then `bat` for unknown types |
+| `feather-preview.py` | Renders `.feather` files via pandas; uses uv inline deps |
+| `pkl-preview.py` | Loads `.pkl`/`.pickle` with rich formatting; detects pandas, dict, list, and generic types |
+| `npy-preview.py` | Renders `.npy` arrays — heatmap via matplotlib+chafa for 2D/3D, raw print for 1D/4D+ |
+| `torch-preview.py` | Loads `.pt` PyTorch checkpoints and pretty-prints them; uv inline dep on `torch` |
+| `torch-preview.sh` | Legacy wrapper that calls `$HOME/ml3/bin/python` directly — superseded by `torch-preview.py` |
 
-## Key Files
-| File | Role | Notable Exports |
-|------|------|-----------------|
-| fzf-preview.sh | Main dispatcher that routes files to appropriate previewers based on file extension | Previews 20+ file types |
-| torch-preview.py | Loads and pretty-prints PyTorch model tensors | torch version info, tensor data |
-| pkl-preview.py | Displays pickle files with rich formatting, handles pandas objects | Formatted pickle contents |
-| feather-preview.py | Reads and displays Apache Feather columnar data | pandas DataFrame |
-| npy-preview.py | Renders NumPy arrays as matplotlib heatmaps for 2D/3D data | Text output or PNG via chafa |
-| torch-preview.sh | Legacy shell wrapper for torch preview (deprecated by .py version) | torch tensor display |
+<!-- peek -->
 
-## Patterns
-- **Format dispatcher**: Single entry point (fzf-preview.sh) routes to specialized previewers via file extension matching
-- **Language-specific handlers**: Python scripts for data-heavy formats (torch, numpy, pandas), shell for light formats
-- **Rich formatting**: Uses `rich`, `glow`, `bat`, `jq` for colored terminal output
-- **Graceful degradation**: Falls back to syntax highlighting (bat) or tldr when specialized tools unavailable
-- **Inline dependencies**: Python scripts use uv inline script format (`#!/usr/bin/env -S uv run --script`)
+## Conventions
+- All `.py` previewer scripts use the `#!/usr/bin/env -S uv run --script` shebang with inline `# /// script` dependency blocks — no separate venv or install step needed.
+- Scripts are invoked as bare commands (`pkl-preview`, `feather-preview`, etc.) because `setup.sh` symlinks the entire `preview/` directory into `~/bin/` and strips the extension on copy.
+- `fzf-preview.sh` calls previewer commands by their bare name (e.g., `pkl-preview "$1"`), so the symlink in `~/bin/` must exist for them to resolve.
 
-## Dependencies
-- **External CLI tools**: sqlite3, parquet-tools, jq, bat, markitdown, glow, chafa, vd, pdftotext, ffmpegthumbnailer, tldr, eza, rich
-- **Python libraries**: torch, pandas, pyarrow, numpy, matplotlib, rich, pickle (stdlib)
-- **Media viewers**: chafa (terminal image viewer), ffmpegthumbnailer (video thumbnails)
-
-## Entry Points
-- **fzf-preview.sh**: Primary entry point, typically invoked by FZF as a preview command for file browsing
-- Individual .py/.sh scripts: Called as subcommands from fzf-preview.sh or directly from shell
-
-## Subdirectories
-| Directory | Purpose | Has Context File |
-|-----------|---------|-----------------|
-| .claude | Claude AI logs (post_tool_use.json, stop.json, chat.json, subagent_stop.json) | no |
+## Gotchas
+- `torch-preview.sh` hardcodes `$HOME/ml3/bin/python` — it will silently fail on machines without that venv. Prefer `torch-preview.py` which uses uv.
+- `npy-preview.py` uses `open_memmap` (read-only, no full load into RAM) — safe for large arrays, but requires the file to be a proper `.npy` format, not `.npz`.
+- For 2D/3D arrays, `npy-preview.py` renders via `chafa` after saving a temp PNG to `/tmp/npy_preview.png`; if `chafa` is missing the image is silently saved but nothing displays.
+- `fzf-preview.sh` queries `.db` files using only the first table returned by `.tables` — multi-table databases will only show one table.
