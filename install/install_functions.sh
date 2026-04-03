@@ -599,7 +599,12 @@ install_pq() {
 
 install_bat() {
     if [[ "$OS_TYPE" == "linux" ]]; then
-        bash install/install_tar.sh "https://github.com/sharkdp/bat/releases/download/v0.18.3/bat-v0.18.3-x86_64-unknown-linux-musl.tar.gz"
+        sudo apt install -y bat
+        # Debian/Ubuntu installs bat as 'batcat' — symlink to expected name
+        if command_exists batcat && ! command_exists bat; then
+            mkdir -p "$HOME/bin"
+            ln -sf "$(command -v batcat)" "$HOME/bin/bat"
+        fi
     elif [[ "$OS_TYPE" == "mac" ]]; then
         brew install bat
     fi
@@ -608,7 +613,12 @@ install_bat() {
 
 install_eza() {
     if [[ "$OS_TYPE" == "linux" ]]; then
-        bash install/install_tar.sh "https://github.com/eza-community/eza/releases/download/v0.18.2/eza_x86_64-unknown-linux-musl.tar.gz"
+        if sudo apt install -y eza 2>/dev/null; then
+            :
+        else
+            source "$HOME/.cargo/env" 2>/dev/null || true
+            cargo install eza
+        fi
     elif [[ "$OS_TYPE" == "mac" ]]; then
         brew install eza
     fi
